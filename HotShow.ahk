@@ -12,7 +12,7 @@
  * ------------------
  *
  * -----------------------------------------------------------------------------------------------
- * License          :           Copyright ©2010 RaptorX <GPLv3>
+ * License          :           Copyright ©2011 RaptorX <GPLv3>
  *
  *          This program is free software: you can redistribute it and/or modify
  *          it under the terms of the GNU General Public License as published by
@@ -34,11 +34,11 @@
  * GUI 02 - HotkeyText
  *
  * =============================================================================================== *
- */
+ */ 
 
 ;+--> ; ---------[Includes]---------
 #include *i %a_scriptdir%
-#include lib\klist.ahk
+#include lib\klist.h.ahk
 ;-
  
 ;+--> ; ---------[Directives]---------
@@ -47,7 +47,7 @@
 ; --
 SetBatchLines -1
 SendMode Input
-SetTitleMatchMode, Regex
+; SetTitleMatchMode, Regex
 SetWorkingDir %A_ScriptDir%
 onExit, Clean
 ;-
@@ -327,40 +327,107 @@ debug(msg,delimiter = False){
         FileAppend, %msg%`n, %debugfile%
     }
 }
-update(lversion, rfile="github", logurl="", vline=5){
-    global s_author, s_name
-    
-    debug ? debug("* update() [Start]", 1)
-    t := rfile = "github" ? logurl := "http://www.github.com/" s_author "/" s_name "/raw/master/Changelog.txt"
-    UrlDownloadToFile, %logurl%, %a_temp%\logurl
-    FileReadLine, logurl, %a_temp%\logurl, %vline%
-    RegexMatch(logurl, "v(.*)", version)
-    if (rfile = "github"){
-        if (a_iscompiled)
-            rfile := "http://github.com/downloads/" s_author "/" s_name "/" s_name "-" Version "-Compiled.zip"
-        else 
-            rfile := "http://github.com/" s_author "/" s_name "/zipball/" Version
+update(lversion, rfile="github", logurl="", vline=1){
+        global script, conf, debug
+
+        debug ? debug("* update() [Start]", 1), node := conf.selectSingleNode("/AHK-Toolkit/@version")
+        if  node.text != script.version
+        {
+            node.text := script.version
+            conf.save(script.conf), conf.load(script.conf), node:=root:=options:=null             ; Save & Clean
+        }
+        
+        if a_thismenuitem = Check for Updates
+            Progress, 50,,, % "Updating..."
+
+        logurl := rfile = "github" ? "https://raw.github.com/" script.author
+                                   . "/" script.name "/ver/ver" : logurl
+
+        RunWait %ComSpec% /c "Ping -n 1 google.com" ,, Hide  ; Check if we are connected to the internet
+        if connected := !ErrorLevel
+        {
+            debug ? debug("* Downloading log file")
+
+            if a_thismenuitem = Check for Updates
+                Progress, 90
+
+            UrlDownloadToFile, %logurl%, %a_temp%\logurl
+            FileReadLine, logurl, %a_temp%\logurl, %vline%
+            debug ? debug("* Version: " logurl)
+            RegexMatch(logurl, "v(.*)", Version)
+            rfile := rfile = "github" ? ("https://www.github.com/"  
+                                      . script.author "/" 
+                                      . script.name "/zipball/" (a_iscompiled ? "latest-compiled" : "latest"))
+                                      : rfile
+            debug ? debug("* Local Version: " lversion " Remote Version: " Version1)
+            
+            if (Version1 > lversion){
+                Progress, Off
+                debug ? debug("* There is a new update available")
+                Msgbox, 0x40044
+                      , % "New Update Available"
+                      , % "There is a new update available for this application.`n"
+                        . "Do you wish to upgrade to " Version "?"
+                      , 10 ; 10s timeout
+                IfMsgbox, Timeout
+                {
+                    debug ? debug("* Update message timed out", 3)
+                    return 1
+                }
+                IfMsgbox, No
+                {
+                    debug ? debug("* Update aborted by user", 3)
+                    return 2
+                }
+                debug ? debug("* Downloading file to: " a_temp "\ahk-tk.zip")
+                Download(rfile, a_temp "\ahk-tk.zip")
+                oShell := ComObjCreate("Shell.Application")
+                oDir := oShell.NameSpace(a_temp), oZip := oShell.NameSpace(a_temp "\ahk-tk.zip")
+                oDir.CopyHere(oZip.Items), oShell := oDir := oZip := ""
+                
+                ; FileCopy instead of FileMove so that file permissions are inherited correctly.
+                Loop, % a_temp "\RaptorX*", 1
+                    FileCopyDir, %a_loopfilefullpath%, %a_scriptdir%, 1
+                
+                FileDelete, %a_temp%\ahk-tk.zip
+                FileDelete, %a_temp%\RaptorX*
+                
+                Msgbox, 0x40040
+                      , % "Installation Complete"
+                      , % "The application will restart now."
+                
+                Reload
+            }
+            else if (a_thismenuitem = "Check for Updates")
+            {
+                Progress, Off
+                debug ? (debug("* Script is up to date"), debug("* update() [End]", 2))
+                Msgbox, 0x40040
+                      , % "Script is up to date"
+                      , % "You are using the latest version of this script.`n"
+                        . "Current version is v" lversion
+                      , 10 ; 10s timeout
+
+                IfMsgbox, Timeout
+                {
+                    debug ? debug("* Update message timed out", 3)
+                    return 1
+                }
+                return 0
+            }
+            else
+            {
+                debug ? (debug("* Script is up to date"), debug("* update() [End]", 2))
+                return 0
+            }
+        }
+        else
+        {
+            Progress, Off
+            debug ? (debug("* Connection Failed", 3), debug("* update() [End]", 2))
+            return 3
+        }
     }
-    if (version1 > lversion){
-        Msgbox, 68, % "New Update Available"
-                  , % "There is a new update available for this application.`n"
-                    . "Do you wish to upgrade to " Version "?"
-                  , 10 ; 10s timeout
-        IfMsgbox, Timeout
-            return 1 debug ? debug("* Update message timed out", 3)
-        IfMsgbox, No
-            return 2 debug ? debug("* Update aborted by user", 3)
-        FileSelectFile, lfile, S16, %a_temp%
-        UrlDownloadToFile, %rfile%, %lfile%
-        Msgbox, 64, % "Download Complete"
-                  , % "To install the new version simply replace the old file with the one`n"
-                  .   "that was downloaded.`n`n The application will exit now."
-        Run, %lfile%
-        ExitApp
-    }
-    debug ? debug("* update() [End]", 2)
-    return 0
-}
 ;-
 
 ;+--> ; ---------[Hotkeys/Hotstrings]---------
