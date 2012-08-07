@@ -47,7 +47,7 @@
 ; --
 SetBatchLines -1
 SendMode Input
-; SetTitleMatchMode, Regex
+SetTitleMatchMode, Regex
 SetWorkingDir %A_ScriptDir%
 onExit, Clean
 ;-
