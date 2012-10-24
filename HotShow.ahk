@@ -12,7 +12,7 @@
  * ------------------
  *
  * -----------------------------------------------------------------------------------------------
- * License          :           Copyright ©2011 RaptorX <GPLv3>
+ * License          :           Copyright ï¿½2011 RaptorX <GPLv3>
  *
  *          This program is free software: you can redistribute it and/or modify
  *          it under the terms of the GNU General Public License as published by
@@ -380,7 +380,7 @@ update(lversion, rfile="github", logurl="", vline=1){
                     return 2
                 }
                 debug ? debug("* Downloading file to: " a_temp "\ahk-tk.zip")
-                Download(rfile, a_temp "\ahk-tk.zip")
+                UrlDownloadToFile, % rfile, % a_temp "\ahk-tk.zip"
                 oShell := ComObjCreate("Shell.Application")
                 oDir := oShell.NameSpace(a_temp), oZip := oShell.NameSpace(a_temp "\ahk-tk.zip")
                 oDir.CopyHere(oZip.Items), oShell := oDir := oZip := ""
